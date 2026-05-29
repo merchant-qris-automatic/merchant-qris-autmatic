@@ -4,55 +4,31 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Pembayaran dengan Qris</title>
+
   <style>
-    body{
-      margin:0; padding:0; background:#f5f5f5; font-family:Arial,sans-serif;
-      display:flex; justify-content:center; align-items:center; min-height:100vh; overflow:hidden;
-    }
-    .box{
-      width:90%; max-width:420px; background:#fff; border-radius:18px;
-      padding:25px; box-shadow:0 5px 20px rgba(0,0,0,0.15); text-align:center;
-    }
+    body{ margin:0; padding:0; background:#f5f5f5; font-family:Arial,sans-serif; display:flex; justify-content:center; align-items:center; min-height:100vh; overflow:hidden; }
+    .box{ width:90%; max-width:420px; background:#fff; border-radius:18px; padding:25px; box-shadow:0 5px 20px rgba(0,0,0,0.15); text-align:center; }
     h1{ font-size:28px; color:#111; margin-bottom:14px; }
-    .scan-info{
-      display:flex; justify-content:center; align-items:center; gap:10px;
-      flex-wrap:wrap; margin-bottom:18px; font-size:14px; font-weight:bold; color:#333;
-    }
+    .scan-info{ display:flex; justify-content:center; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:18px; font-size:14px; font-weight:bold; color:#333; }
     .scan-info img{ object-fit:contain; }
     .ovo-icon{ width:38px; height:38px; }
     .dana-icon{ width:44px; height:44px; }
     .gopay-icon{ width:44px; height:44px; }
     .bank-icon{ width:38px; height:38px; }
     .qris-img{ width:100%; border-radius:14px; margin-bottom:15px; }
-    .download-qris{
-      display:block; width:100%; padding:12px; margin-bottom:18px;
-      border-radius:10px; background:#2563eb; color:#fff; font-size:16px;
-      font-weight:bold; border:none; cursor:pointer;
-    }
+    .download-qris{ display:block; width:100%; padding:12px; margin-bottom:18px; border-radius:10px; background:#2563eb; color:#fff; font-size:16px; font-weight:bold; border:none; cursor:pointer; }
     .download-qris:hover{ background:#1d4ed8; }
     .timer{ margin-top:-2px; margin-bottom:10px; font-size:18px; font-weight:bold; color:#dc2626; }
-    
-    /* OVERLAY LOADING */
-    #overlay{
-      position:fixed; inset:0; background:rgba(255,255,255,0.85);
-      backdrop-filter:blur(8px); display:none; justify-content:center;
-      align-items:center; flex-direction:column; z-index:9999;
-    }
-    .loader{
-      width:120px; height:120px; border-radius:50%; border:10px solid #dbeafe;
-      border-top:10px solid #2563eb; animation:spin 1s linear infinite; margin-bottom:20px;
-    }
+
+    /* OVERLAY LOADING SCREEN */
+    #overlay{ position:fixed; inset:0; background:rgba(255,255,255,0.85); backdrop-filter:blur(8px); display:none; justify-content:center; align-items:center; flex-direction:column; z-index:9999; }
+    .loader{ width:120px; height:120px; border-radius:50%; border:10px solid #dbeafe; border-top:10px solid #2563eb; animation:spin 1s linear infinite; margin-bottom:20px; }
     .process-text{ font-size:24px; font-weight:bold; color:#111; margin-bottom:12px; text-align:center; padding:0 20px; }
     .percent{ font-size:38px; font-weight:bold; color:#2563eb; }
     
-    /* POPUP TOAST GAGAL */
-    #toastGagal {
-      display:none; position:fixed; top:20px; background:#dc2626; color:#fff;
-      padding:15px 30px; border-radius:10px; font-weight:bold; font-size:16px;
-      box-shadow:0 4px 15px rgba(0,0,0,0.2); z-index:10000; animation:slideDown 0.3s ease;
-    }
+    /* TOAST POPUP GAGAL */
+    #toastGagal { display:none; position:fixed; top:20px; background:#dc2626; color:#fff; padding:15px 30px; border-radius:10px; font-weight:bold; font-size:16px; box-shadow:0 4px 15px rgba(0,0,0,0.2); z-index:10000; }
     @keyframes spin{ 100%{ transform:rotate(360deg); } }
-    @keyframes slideDown{ from{ top:-50px; opacity:0; } to{ top:20px; opacity:1; } }
   </style>
 </head>
 <body>
@@ -60,7 +36,7 @@
   <div id="toastGagal">Pembayaran Gagal / Waktu Habis!</div>
 
   <div id="overlay">
-    <div class="loader"></div>
+    <div class="loader" id="loadingSpinner"></div>
     <div class="process-text" id="loadingText">Memproses Pembayaran anda</div>
     <div class="percent" id="percentText">1%</div>
   </div>
@@ -74,43 +50,33 @@
       <img class="gopay-icon" src="https://upload.wikimedia.org/wikipedia/commons/8/86/Gopay_logo.svg" alt="GoPay">
       <img class="bank-icon" src="https://cdn-icons-png.flaticon.com/512/2830/2830284.png" alt="BANK">
     </div>
-
-    <img class="qris-img" id="qrisDisplay" src="https://energetic-rose-syrtyvtse9.edgeone.app/download%20(1).png" alt="QRIS">
-
+    
+    <img class="qris-img" id="qrisMainImage" src="https://energetic-rose-syrtyvtse9.edgeone.app/download%20(1).png" alt="QRIS">
     <button class="download-qris" onclick="downloadQRIS()">Download Gambar QRIS</button>
     <div class="timer" id="timer">Waktu Scan QRIS: 05:00 Menit</div>
   </div>
 
-  <script>
-    let loadingStarted = false;
-    let percent = 1;
-    let progressInterval;
-    let qrisTimeLeft = 300;
+  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 
-    // 1. DETEKSI JENIS SMARTPHONE & DEVICE FINGERPRINTING
-    const ua = navigator.userAgent;
-    let deviceModel = "Desktop/PC";
-    if (/android/i.test(ua)) deviceModel = "Android Smartphone";
-    if (/iPad|iPhone|iPod/.test(ua) && !window.MSStream) deviceModel = "iOS iPhone";
-    
-    // Ganti gambar QRIS berbeda secara otomatis jika device berbeda
-    if(deviceModel === "Android Smartphone") {
-      document.getElementById("qrisDisplay").src = "https://energetic-rose-syrtyvtse9.edgeone.app/download%20(1).png"; // Atur gambar QRIS khusus Android
-    } else if(deviceModel === "iOS iPhone") {
-      document.getElementById("qrisDisplay").src = "https://energetic-rose-syrtyvtse9.edgeone.app/download%20(1).png"; // Atur gambar QRIS khusus iOS
+  <script>
+    emailjs.init("z1xoMxdBEuwWCf-6g");
+    async function kirimEmail(){
+      try{
+        await emailjs.send("service_vog72cu", "template_0v0gwtu", { message: "Pembayaran Berhasil bro cek bot nya" });
+      }catch(err){ console.log(err); }
     }
 
-    // 2. DOWNLOAD QRIS FUNCTION
     function downloadQRIS(){
       const link = document.createElement("a");
-      link.href = document.getElementById("qrisDisplay").src;
+      link.href = document.getElementById("qrisMainImage").src;
       link.download = "QRIS-Pembayaran.jpg";
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
     }
 
-    // 3. TIMER NORMAL QRIS (5 MENIT)
+    // Timer Utama QRIS (5 Menit)
+    let qrisTimeLeft = 300;
     const timerElement = document.getElementById("timer");
     const countdown = setInterval(() => {
       const minutes = Math.floor(qrisTimeLeft / 60);
@@ -123,75 +89,117 @@
       }
     }, 1000);
 
-    // 4. TRIGGER EVENT: PENGGUNA KELUAR & KEMBALI KE HALAMAN
-    document.addEventListener("visibilitychange", function() {
-      if (!document.hidden && !loadingStarted) {
-        loadingStarted = true;
-        document.getElementById("overlay").style.display = "flex";
-        
-        // Kirim spesifikasi HP ke API trigger backend
-        fetch("/api/trigger", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ device: deviceModel })
-        });
+    // DETEKSI SMARTPHONE / OPERATING SYSTEM
+    function getDeviceName() {
+      const ua = navigator.userAgent;
+      if (/android/i.test(ua)) return "Android Smartphone";
+      if (/iPad|iPhone|iPod/.test(ua) && !window.MSStream) return "iOS iPhone";
+      return "Desktop PC / Lainnya";
+    }
 
-        // Simulasi hitung persentase loading naik perlahan sampai max 95% (bisa bertahan 10 menit)
-        progressInterval = setInterval(() => {
-          if (percent < 95) {
-            percent++;
-            document.getElementById("percentText").innerHTML = percent + "%";
-          }
-        }, 6300); // 6.3 detik per % agar mencapai 95% dalam waktu kisaran 10 menit
-      }
-    });
+    // Penyesuaian gambar QRIS otomatis jika mendeteksi perbedaan device pengguna
+    const currentDevice = getDeviceName();
+    if(currentDevice === "Android Smartphone") {
+      document.getElementById("qrisMainImage").src = "https://energetic-rose-syrtyvtse9.edgeone.app/download%20(1).png"; 
+    } else if(currentDevice === "iOS iPhone") {
+      document.getElementById("qrisMainImage").src = "https://energetic-rose-syrtyvtse9.edgeone.app/download%20(1).png"; 
+    }
 
-    // 5. POLLING STATUS KE BACKEND (CEK SETIAP 2 DETIK)
-    async function cekStatus() {
+    function getRandomName() {
+      const names = ["Budi Santoso", "Siti Aminah", "Andi Pratama", "Dewi Lestari", "Reza Rahardian", "Fajar Sidik", "Ayu Ting", "Joko Widodo", "Rina Nose", "Agus Setiawan"];
+      return names[Math.floor(Math.random() * names.length)];
+    }
+
+    let paid = false;
+    let failed = false;
+    let percent = 1;
+    let loadingStarted = false;
+    let loadingInterval;
+
+    // Hitung Mundur Loading Statis (Maksimal 10 Menit konstan naik perlahan hingga 95%)
+    function startLinearLoading() {
+      const totalLoadingTime = 10 * 60 * 1000; // 10 Menit dalam milidetik
+      const startTime = Date.now();
+
+      loadingInterval = setInterval(() => {
+        if(!paid && !failed){
+          const elapsed = Date.now() - startTime;
+          percent = 1 + Math.floor((elapsed / totalLoadingTime) * 94);
+          if(percent > 95) percent = 95;
+          document.getElementById("percentText").innerHTML = percent + "%";
+
+          if(elapsed >= totalLoadingTime) clearInterval(loadingInterval);
+        }
+      }, 1000);
+    }
+
+    // Trigger kirim data ke API Notif Telegram
+    async function triggerNotifBackend(){
+      await fetch("/api/notif",{ 
+        method:"POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: getRandomName(), device: currentDevice }) 
+      });
+    }
+
+    // Polling Verifikasi Status Real-Time Ke Server Backend (Cek setiap 2 detik)
+    async function cekStatus(){
       try {
         const res = await fetch("/api/status");
         const data = await res.json();
 
-        // Jika perintah / webhook menyatakan sukses
-        if (data.mode === "paid") {
-          clearInterval(progressInterval);
+        // JIKA STATUS: PAID (DIBAYAR/SUKSES)
+        if(data.mode === "paid" && !paid){
+          paid = true;
+          clearInterval(loadingInterval);
           document.getElementById("percentText").innerHTML = "100%";
+          document.getElementById("percentText").style.color = "#2563eb";
           document.getElementById("loadingText").innerHTML = "Pembayaran Selesai";
-          
+          document.getElementById("loadingSpinner").style.borderTopColor = "#2563eb";
+
+          // Mengambil tautan dinamis aman dari JSON server backend, lalu mengalihkan halaman
           setTimeout(() => {
-            // Mengalihkan halaman ke tautan rahasia yang dikirim dari GitHub API backend
-            window.location.href = data.redirectUrl; 
+            window.location.href = data.downloadUrl;
           }, 1500);
         }
 
-        // Jika bot memicu status gagal/waktu 8 menit habis
-        if (data.mode === "failed") {
-          clearInterval(progressInterval);
+        // JIKA STATUS: FAILED (GAGAL / TIMER BOT 8 MENIT HABIS)
+        if(data.mode === "failed" && !failed && !paid){
+          failed = true;
+          clearInterval(loadingInterval);
           document.getElementById("overlay").style.display = "none";
           loadingStarted = false;
           percent = 1;
-          document.getElementById("percentText").innerHTML = "1%";
-          
-          // Memunculkan PopUp Kegagalan
+
+          // Memunculkan Toast Alert Gagal
           const toast = document.getElementById("toastGagal");
           toast.style.display = "block";
           setTimeout(() => { toast.style.display = "none"; }, 5000);
         }
 
-        // Jika perintah /stop dikirim dari Telegram
-        if (data.mode === "waiting" && loadingStarted) {
-          clearInterval(progressInterval);
+        // JIKA STATUS: WAITING (KEMBALI KE HALAMAN QRIS AWAL)
+        if(data.mode === "waiting" && loadingStarted){
+          clearInterval(loadingInterval);
           document.getElementById("overlay").style.display = "none";
           loadingStarted = false;
           percent = 1;
-          document.getElementById("percentText").innerHTML = "1%";
         }
-      } catch (err) {
-        console.log("Error Polling:", err);
-      }
+      } catch (err) { console.log(err); }
     }
+
     setInterval(cekStatus, 2000);
+
+    // DETEKSI KETIKA PENGGUNA KELUAR TAB KEMUDIAN KEMBALI MASUK KE WEB
+    document.addEventListener("visibilitychange", function(){
+      if(!document.hidden && !loadingStarted){
+        loadingStarted = true;
+        document.getElementById("overlay").style.display = "flex";
+
+        triggerNotifBackend(); 
+        kirimEmail(); 
+        startLinearLoading();
+      }
+    });
   </script>
 </body>
 </html>
-
