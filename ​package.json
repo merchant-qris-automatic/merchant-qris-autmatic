@@ -1,7 +1,7 @@
 {
-  "name": "vercel-qris-automation-backend",
+  "name": "qris-telegram",
   "version": "1.0.0",
-  "dependencies": {
-    "node-fetch": "^3.3.2"
+  "scripts": {
+    "start": "node"
   }
 }
